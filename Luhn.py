@@ -3,7 +3,10 @@ import random
 
 class Card:
     def __init__(self):
-        self.card_number = int("400000" + str(random.randrange(0000000000, 9999999999)))
+        while True:
+            self.card_number = int("400000" + str(random.randrange(0000000000, 9999999999)))
+            if self.luhn_algorithm():
+                break
         self.card_pin = random.randrange(0000, 9999)
         self.balance = 0
 
@@ -13,6 +16,23 @@ class Card:
             return True
         elif self.card_number != number or self.card_pin != pin:
             print("\nWrong card number or PIN!\n")
+            return False
+
+    def luhn_algorithm(self):
+        multi_card_number = []
+        for i, value in enumerate(str(self.card_number)[:-1]):
+            if i % 2 == 0:
+                value = int(value) * 2
+                if int(value) > 9:
+                    value = int(value) - 9
+                    multi_card_number.append(value)
+                else:
+                    multi_card_number.append(value)
+            else:
+                multi_card_number.append(value)
+        if (sum([int(k) for k in multi_card_number]) + int(str(self.card_number)[-1])) % 10 == 0:
+            return True
+        else:
             return False
 
     def get_balance(self):
