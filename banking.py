@@ -2,42 +2,80 @@ import random
 import sqlite3
 
 
-# drop table card;
-#
-# CREATE TABLE card (
-#   id INTEGER PRIMARY KEY autoincrement ,
-#   number TEXT,
-#   pin TEXT,
-#   balance INTEGER DEFAULT 0
-# );
-
 class Card:
     conn = sqlite3.connect('card.s3db')
 
-    def __init__(self):
-        cur = self.conn.cursor()
+    cur = conn.cursor()
+    card_pin = 0
+    card_number = 0
+    balance = 0
 
+    def create_account(self):
         while True:
-            self.card_number = int("400000" + str(random.randrange(0000000000, 9999999999)))
+            self.card_number = int("400000" + str(''.join([str(random.randint(0, 9)) for _ in range(10)])))
             if self.luhn_algorithm():
                 break
-        self.card_pin = random.randrange(0000, 9999)
+        self.card_pin = ''.join([str(random.randint(0, 9)) for _ in range(4)])
         self.balance = 0
-        cur.execute(
+        self.cur.execute(
             "CREATE TABLE IF NOT EXISTS card  (  id INTEGER PRIMARY KEY autoincrement , "
             " number TEXT,  pin TEXT,  balance INTEGER DEFAULT 0);")
-        cur.execute("INSERT INTO card (number, pin, balance) values (?, ?, ?)",
-                    (self.card_number, self.card_pin, self.balance))
+        self.cur.execute("INSERT INTO card (number, pin, balance) values (?, ?, ?)",
+                         (self.card_number, self.card_pin, self.balance))
         self.conn.commit()
 
+    def __init__(self):
+        self.cur.execute(
+            "CREATE TABLE IF NOT EXISTS card  (  id INTEGER PRIMARY KEY autoincrement , "
+            " number TEXT,  pin TEXT,  balance INTEGER DEFAULT 0);")
+        self.conn.commit()
 
     def login(self, number, pin):
-        if self.card_number == number and self.card_pin == pin:
+        self.cur.execute(f"SELECT * FROM card WHERE pin = {pin} and number = {number}")
+        account = self.cur.fetchall()
+        if account[0][1] == str(number) and account[0][2] == str(pin):
             print('\nYou have successfully logged in!\n')
             return True
-        elif self.card_number != number or self.card_pin != pin:
+        else:
             print("\nWrong card number or PIN!\n")
             return False
+
+    def get_customer_balance(self, number, pin):
+        self.cur.execute(f"SELECT balance FROM card WHERE pin = {pin} and number = {number};")
+        balance = self.cur.fetchall()
+        self.balance = balance[0][0]
+        return self.balance
+
+    def add_income(self, pin, number, value):
+        self.cur.execute(f"SELECT balance FROM card WHERE pin = {pin} and number = {number};")
+        current_balance = self.cur.fetchall()
+        new_balance = int(current_balance[0][0]) + int(value)
+        self.cur.execute(f"UPDATE card SET balance = {new_balance} WHERE pin = {pin} and number = {number};")
+        self.conn.commit()
+
+    def do_transfer(self, card_number, card_transfer, money_to_transfer):
+        self.cur.execute(f"SELECT balance FROM card WHERE number = {card_number};")
+        current_balance = self.cur.fetchall()
+        self.cur.execute(f"SELECT balance FROM card WHERE number = {card_transfer};")
+
+    def close_account(self, number, pin):
+        self.cur.execute(f"DELETE FROM card WHERE pin = {pin} and number = {number};")
+        self.conn.commit()
+
+    def check_if_card_exist(self, number):
+        self.cur.execute(f"SELECT * FROM card WHERE number = {number};")
+        card = self.cur.fetchall()
+        if card:
+            return True
+        else:
+            return False
+
+    def get_all_data(self):
+        self.cur.execute("SELECT * FROM card;")
+        data = self.cur.fetchall()
+        for i in data:
+            print(i)
+        print()
 
     def luhn_algorithm(self):
         multi_card_number = []
@@ -56,29 +94,46 @@ class Card:
         else:
             return False
 
-    def get_balance(self):
-        return self.balance
-
 
 while True:
     menu = input("1. Create an account\n2. Log into account\n0. Exit\n")
-    global customer
+    customer = Card()
     if menu == "1":
-        customer = Card()
+        customer.create_account()
         print("\nYour card has been created")
         print(f"Your card number: \n{customer.card_number}")
         print(f"Your card PIN: \n{customer.card_pin}\n")
     if menu == "2":
-        result = customer.login(int(input("Enter your card number:\n")), int(input("Enter your PIN:\n")))
-        if result:
+        card_number = int(input("Enter your card number:\n"))
+        pin = int(input("Enter your PIN:\n"))
+        if customer.login(card_number, pin):
             while True:
-                menu = input("1. Balance\n2. Log out\n0. Exit\n")
+                menu = input("1. Balance\n2. Add income\n"
+                             "3. Do transfer\n4. Close account\n5. Log out\n0. Exit\n")
                 if menu == "1":
-                    print(f"\nBalance: {customer.balance} \n")
+                    print(f"\nBalance: {customer.get_customer_balance(card_number, pin)} \n")
                 if menu == "2":
+                    customer.add_income(pin, card_number, input('Enter income: \n'))
+                    print("Income was added!\n")
+                if menu == "3":
+                    print('\nTransfer')
+                    card_to_transfer = input('Enter card number: \n')
+                    if customer.check_if_card_exist(card_to_transfer):
+                        customer.do_transfer(card_number, card_to_transfer,
+                                             input('Enter how much money you want to transfer: \n'))
+                    else:
+                        print("Such a card does not exist.\n")
+                if menu == "4":
+                    customer.close_account(number=card_number, pin=pin)
+                    print("The account has been closed!\n")
+                    break
+                if menu == "5":
                     print("\nYou have successfully logged out!\n")
                     break
                 if menu == "0":
                     break
+    if menu == "8":
+        customer.get_all_data()
     if menu == "0":
+        print("\nBye!")
         break
